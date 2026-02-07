@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #A7C6ED;
+  --color-accent: #8BC3E6;
+  --color-complementary: #BFE5F0;
+  --color-nhs: #005EB8;
+  
+  --animate-bounce-slow: bounce-slow 2s ease-in-out infinite;
+}
+
+@keyframes bounce-slow {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
