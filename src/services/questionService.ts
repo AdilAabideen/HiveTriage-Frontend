@@ -1,6 +1,7 @@
 import { CategorySelectionItem, ChiefComplaintSubmission } from '../types/question'
+import { config } from '../config/env'
 
-const API_BASE_URL = 'http://127.0.0.1:8000'
+const API_BASE_URL = config.apiBaseUrl
 
 // Type for category selection submission
 interface CategorySelection {
@@ -28,6 +29,7 @@ export const questionService = {
   },
 
   submitRegistration: async (registrationAnswers: Record<string, string>) => {
+    console.log('submitRegistration', registrationAnswers)
     const response = await fetch(`${API_BASE_URL}/submit-registration`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

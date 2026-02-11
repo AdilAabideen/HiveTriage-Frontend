@@ -1,395 +1,154 @@
-import { useReducer, useEffect, useCallback } from 'react'
-import { IntakeState, IntakeAction, Question, SafetyScreenAnswerResponse, ChiefComplaintCategory, CategorySelectionItem, ChiefComplaintSubcategoriesResponse, ChiefComplaintSubcategory, OnsetBucket, Trend } from '../types/question'
-import { questionService } from '../services/questionService'
+/**
+ * Main intake flow orchestrator hook
+ * Composes useRegistration, useSafetyScreen, and useChiefComplaint
+ */
 
-const initialState: IntakeState = {
-  phase: 'registration_questions',
-  currentQuestionIndex: 0,
-  registrationQuestions: [],
-  registrationAnswers: {},
-  safetyScreenQuestions: [],
-  safetyScreenAnswers: {},
-  chiefComplaintCategories: [],
-  selectedCategories: [],
-  chiefComplaintSubcategories: [],
-  selectedSubcategoriesByCategory: {},
-  currentSubcategoryGroupIndex: 0,
-  chiefComplaintText: '',
-  categoryTimingData: {},
-  encounterId: null,
-  error: null,
-  uiMessage: null,
-  encounterToken: null
-}
-
-function intakeReducer(state: IntakeState, action: IntakeAction): IntakeState {
-  switch (action.type) {
-    case 'SET_REGISTRATION_QUESTIONS':
-      return { ...state, registrationQuestions: action.questions, phase: 'registration_questions' }
-    
-    case 'ANSWER_REGISTRATION':
-      return {
-        ...state,
-        registrationAnswers: { ...state.registrationAnswers, [action.questionId]: action.answer }
-      }
-    
-    case 'COMPLETE_REGISTRATION':
-      return { ...state, phase: 'loading_questions', currentQuestionIndex: 0 }
-    
-    case 'SET_SAFETY_SCREEN_QUESTIONS':
-      return { ...state, safetyScreenQuestions: action.questions, phase: 'safety_screen_questions' }
-    
-    case 'ANSWER_SAFETY_SCREEN':
-      return {
-        ...state,
-        safetyScreenAnswers: { ...state.safetyScreenAnswers, [action.questionId]: action.answer }
-      }
-    
-    case 'NEXT_QUESTION':
-      const nextIndex = state.currentQuestionIndex + 1
-      return { ...state, currentQuestionIndex: nextIndex }
-    
-    case 'SET_LOADING':
-      return { ...state, phase: 'loading_questions' }
-    
-    case 'SET_ERROR':
-      return { ...state, error: action.error }
-    
-    case 'SET_COMPLETE':
-      return { ...state, phase: 'complete', uiMessage: action.uiMessage, encounterToken: action.encounterToken }
-    
-    case 'SET_FAILED_SAFETY_SCREEN':
-      return { ...state, phase: 'failed_safety_screen', uiMessage: action.uiMessage, encounterToken: action.encounterToken }
-    
-    case 'SET_ENCOUNTER_ID':
-      return { ...state, encounterId: action.encounterId }
-    
-    // Chief Complaint Actions
-    case 'SET_CHIEF_COMPLAINT_LOADING_CATEGORIES':
-      return { ...state, phase: 'chief_complaint_loading_categories' }
-    
-    case 'SET_CHIEF_COMPLAINT_CATEGORIES':
-      return { ...state, chiefComplaintCategories: action.categories, phase: 'chief_complaint_categories' }
-    
-    case 'SELECT_CATEGORY':
-      return {
-        ...state,
-        selectedCategories: state.selectedCategories.some(c => c.id === action.category.id)
-          ? state.selectedCategories
-          : [...state.selectedCategories, action.category]
-      }
-    
-    case 'DESELECT_CATEGORY':
-      return {
-        ...state,
-        selectedCategories: state.selectedCategories.filter(c => c.id !== action.categoryId)
-      }
-    
-    case 'COMPLETE_CATEGORY_SELECTION':
-      return { ...state, phase: 'chief_complaint_loading_subcategories' }
-    
-    case 'SET_CHIEF_COMPLAINT_LOADING_SUBCATEGORIES':
-      return { ...state, phase: 'chief_complaint_loading_subcategories' }
-    
-    case 'SET_CHIEF_COMPLAINT_SUBCATEGORIES':
-      return { ...state, chiefComplaintSubcategories: action.subcategories, phase: 'chief_complaint_subcategories', currentSubcategoryGroupIndex: 0 }
-    
-    case 'SELECT_SUBCATEGORY': {
-      const currentFamilyIds = state.selectedSubcategoriesByCategory[action.categoryId] || []
-      if (currentFamilyIds.includes(action.familyId)) {
-        return state // Already selected
-      }
-      return {
-        ...state,
-        selectedSubcategoriesByCategory: {
-          ...state.selectedSubcategoriesByCategory,
-          [action.categoryId]: [...currentFamilyIds, action.familyId]
-        }
-      }
-    }
-    
-    case 'DESELECT_SUBCATEGORY': {
-      const currentFamilyIds = state.selectedSubcategoriesByCategory[action.categoryId] || []
-      return {
-        ...state,
-        selectedSubcategoriesByCategory: {
-          ...state.selectedSubcategoriesByCategory,
-          [action.categoryId]: currentFamilyIds.filter(id => id !== action.familyId)
-        }
-      }
-    }
-    
-    case 'NEXT_SUBCATEGORY_GROUP':
-      return { ...state, currentSubcategoryGroupIndex: state.currentSubcategoryGroupIndex + 1 }
-    
-    case 'SET_CATEGORY_TIMING':
-      return {
-        ...state,
-        categoryTimingData: {
-          ...state.categoryTimingData,
-          [action.categoryId]: { onsetBucket: action.onsetBucket, trend: action.trend }
-        }
-      }
-    
-    case 'SET_CHIEF_COMPLAINT_TEXT_PHASE':
-      return { ...state, phase: 'chief_complaint_text' }
-    
-    case 'SET_CHIEF_COMPLAINT_TEXT':
-      return { ...state, chiefComplaintText: action.text }
-    
-    case 'COMPLETE_CHIEF_COMPLAINT':
-      return { ...state, phase: 'complete' }
-    
-    default:
-      return state
-  }
-}
+import { useState, useCallback, useEffect } from 'react'
+import { useRegistration } from './useRegistration'
+import { useSafetyScreen, SafetyScreenResult } from './useSafetyScreen'
+import { useChiefComplaint } from './useChiefComplaint'
+import { IntakePhase } from '../types'
 
 export function useIntakeFlow() {
-  const [state, dispatch] = useReducer(intakeReducer, initialState)
+  const [phase, setPhase] = useState<IntakePhase>('registration_questions')
+  const [uiMessage, setUiMessage] = useState<string | null>(null)
+  const [encounterToken, setEncounterToken] = useState<string | null>(null)
+  const [globalError] = useState<string | null>(null)
 
-  // Fetch registration questions on mount
+  // Compose child hooks
+  const registration = useRegistration()
+  const safetyScreen = useSafetyScreen(
+    registration.encounterId, 
+    phase === 'loading_questions'
+  )
+  const chiefComplaint = useChiefComplaint(
+    registration.encounterId,
+    phase === 'chief_complaint_loading_categories'
+  )
+
+  // Sync loading state from safety screen
   useEffect(() => {
-    const fetchRegistrationQuestions = async () => {
-      try {
-        const questions: Question[] = await questionService.getRegistrationQuestions()
-        dispatch({ type: 'SET_REGISTRATION_QUESTIONS', questions })
-      } catch (err) {
-        dispatch({ type: 'SET_ERROR', error: err instanceof Error ? err.message : 'Failed to load questions' })
-      }
+    if (phase === 'loading_questions' && !safetyScreen.isLoading && safetyScreen.questions.length > 0) {
+      setPhase('safety_screen_questions')
     }
-    fetchRegistrationQuestions()
-  }, [])
+  }, [phase, safetyScreen.isLoading, safetyScreen.questions.length])
 
-  // Fetch safety screen questions when registration phase completes
+  // Sync chief complaint phase
   useEffect(() => {
-    if (state.phase === 'loading_questions' && Object.keys(state.registrationAnswers).length > 0) {
-      const fetchSafetyScreenQuestions = async () => {
-        try {
-          const registrationResponse = await questionService.submitRegistration(state.registrationAnswers)
-          if (registrationResponse?.encounter_id) {
-            dispatch({ type: 'SET_ENCOUNTER_ID', encounterId: registrationResponse.encounter_id })
-          }
-        } catch (err) {
-          dispatch({ type: 'SET_ERROR', error: err instanceof Error ? err.message : 'Failed to submit registration' })
-          return
-        }
-        try {
-          const questions: Question[] = await questionService.getSafetyScreenQuestions()
-          dispatch({ type: 'SET_SAFETY_SCREEN_QUESTIONS', questions })
-        } catch (err) {
-          console.error(err)
-          dispatch({ type: 'SET_ERROR', error: err instanceof Error ? err.message : 'Failed to load questions' })
-        }
-      }
-      fetchSafetyScreenQuestions()
+    if (phase === 'chief_complaint_loading_categories' && chiefComplaint.phase === 'categories') {
+      setPhase('chief_complaint_categories')
     }
-  }, [state.phase, state.registrationAnswers])
-
-  // Fetch chief complaint categories when safety screen completes with PROCEED_TO_STAGE_2
-  useEffect(() => {
-    if (state.phase === 'chief_complaint_loading_categories') {
-      const fetchCategories = async () => {
-        try {
-          const categories: ChiefComplaintCategory[] = await questionService.getChiefComplaintCategories()
-          dispatch({ type: 'SET_CHIEF_COMPLAINT_CATEGORIES', categories })
-        } catch (err) {
-          dispatch({ type: 'SET_ERROR', error: err instanceof Error ? err.message : 'Failed to load categories' })
-        }
-      }
-      fetchCategories()
+    if (phase === 'chief_complaint_loading_subcategories' && chiefComplaint.phase === 'subcategories') {
+      setPhase('chief_complaint_subcategories')
     }
-  }, [state.phase])
-
-  // Fetch chief complaint subcategories when categories are selected
-  useEffect(() => {
-    if (state.phase === 'chief_complaint_loading_subcategories' && state.selectedCategories.length > 0) {
-      const fetchSubcategories = async () => {
-        try {
-          const response: ChiefComplaintSubcategoriesResponse = await questionService.getChiefComplaintSubcategories(
-            { categories: state.selectedCategories }
-          )
-          const subcategories: ChiefComplaintSubcategory[] = response.subcategories
-          dispatch({ type: 'SET_CHIEF_COMPLAINT_SUBCATEGORIES', subcategories })
-        } catch (err) {
-          dispatch({ type: 'SET_ERROR', error: err instanceof Error ? err.message : 'Failed to load subcategories' })
-        }
-      }
-      fetchSubcategories()
+    if (chiefComplaint.phase === 'text_entry' && phase === 'chief_complaint_subcategories') {
+      setPhase('chief_complaint_text')
     }
-  }, [state.phase, state.selectedCategories])
-
-  const answerRegistrationQuestion = useCallback((questionId: string, answer: string) => {
-    dispatch({ type: 'ANSWER_REGISTRATION', questionId, answer })
-  }, [])
-
-  const completeRegistration = useCallback(() => {
-    dispatch({ type: 'COMPLETE_REGISTRATION' })
-  }, [state.registrationAnswers])
-
-  const answerSafetyScreenQuestion = useCallback(async (questionId: string, answer: string) => {
-    if (!state.encounterId) {
-      dispatch({ type: 'SET_ERROR', error: 'No encounter ID available' })
-      return
+    if (chiefComplaint.phase === 'complete') {
+      setPhase('complete')
     }
+  }, [phase, chiefComplaint.phase])
+
+  // Aggregate errors
+  const error = globalError || registration.error || safetyScreen.error || chiefComplaint.error
+
+  // Registration handlers
+  const handleRegistrationAnswer = useCallback((questionId: string, answer: string) => {
+    registration.answerQuestion(questionId, answer)
+  }, [registration])
+
+  const handleCompleteRegistration = useCallback(async () => {
+    setPhase('loading_questions')
+    const encId = await registration.submitRegistration()
+    if (!encId) {
+      setPhase('registration_questions')
+    }
+  }, [registration])
+
+  // Safety screen handlers
+  const handleSafetyScreenAnswer = useCallback(async (questionId: string, answer: string) => {
+    const result: SafetyScreenResult | null = await safetyScreen.answerQuestion(questionId, answer)
     
-    try {
-      // Submit answer to API
-      const response: SafetyScreenAnswerResponse = await questionService.submitSafetyScreenAnswer(
-        questionId, 
-        answer, 
-        state.encounterId
-      )
-
-      // Update local state
-      dispatch({ type: 'ANSWER_SAFETY_SCREEN', questionId, answer })
-
-      // Check if this is the last question
-      if (response.is_last_question) {
-        if (response.final_action === 'PROCEED_TO_STAGE_2') {
-          // Go to chief complaint flow instead of complete
-          dispatch({ type: 'SET_CHIEF_COMPLAINT_LOADING_CATEGORIES' })
-        } else if (response.final_action === 'SHOW_WAIT_SCREEN') {
-          dispatch({ type: 'SET_FAILED_SAFETY_SCREEN', uiMessage: response.ui_message, encounterToken: response.encounter_token })
-        }
-      } else {
-        dispatch({ type: 'NEXT_QUESTION' })
+    if (result?.isLastQuestion) {
+      if (result.finalAction === 'PROCEED_TO_STAGE_2') {
+        setPhase('chief_complaint_loading_categories')
+      } else if (result.finalAction === 'SHOW_WAIT_SCREEN') {
+        setUiMessage(result.uiMessage)
+        setEncounterToken(result.encounterToken)
+        setPhase('failed_safety_screen')
       }
-    } catch (err) {
-      dispatch({ type: 'SET_ERROR', error: err instanceof Error ? err.message : 'Failed to submit answer' })
     }
-  }, [state.encounterId])
+  }, [safetyScreen])
 
-  // Chief Complaint Actions
-  const selectCategory = useCallback((category: CategorySelectionItem) => {
-    dispatch({ type: 'SELECT_CATEGORY', category })
-  }, [])
+  // Chief complaint handlers
+  const handleCompleteCategorySelection = useCallback(() => {
+    chiefComplaint.completeCategorySelection()
+    setPhase('chief_complaint_loading_subcategories')
+  }, [chiefComplaint])
 
-  const deselectCategory = useCallback((categoryId: string) => {
-    dispatch({ type: 'DESELECT_CATEGORY', categoryId })
-  }, [])
+  const handleNextSubcategoryGroup = useCallback(() => {
+    chiefComplaint.nextSubcategoryGroup()
+  }, [chiefComplaint])
 
-  const toggleCategory = useCallback((id: string, name: string) => {
-    if (state.selectedCategories.some(c => c.id === id)) {
-      dispatch({ type: 'DESELECT_CATEGORY', categoryId: id })
-    } else {
-      dispatch({ type: 'SELECT_CATEGORY', category: { id, name } })
-    }
-  }, [state.selectedCategories])
+  const handleSubmitChiefComplaintText = useCallback(async () => {
+    await chiefComplaint.submitChiefComplaint()
+  }, [chiefComplaint])
 
-  const completeCategorySelection = useCallback(() => {
-    if (state.selectedCategories.length > 0) {
-      dispatch({ type: 'COMPLETE_CATEGORY_SELECTION' })
-    }
-  }, [state.selectedCategories])
-
-  const selectSubcategory = useCallback((categoryId: string, familyId: string) => {
-    dispatch({ type: 'SELECT_SUBCATEGORY', categoryId, familyId })
-  }, [])
-
-  const deselectSubcategory = useCallback((categoryId: string, familyId: string) => {
-    dispatch({ type: 'DESELECT_SUBCATEGORY', categoryId, familyId })
-  }, [])
-
-  const toggleSubcategory = useCallback((categoryId: string, familyId: string) => {
-    const currentFamilyIds = state.selectedSubcategoriesByCategory[categoryId] || []
-    if (currentFamilyIds.includes(familyId)) {
-      dispatch({ type: 'DESELECT_SUBCATEGORY', categoryId, familyId })
-    } else {
-      dispatch({ type: 'SELECT_SUBCATEGORY', categoryId, familyId })
-    }
-  }, [state.selectedSubcategoriesByCategory])
-
-  const nextSubcategoryGroup = useCallback(() => {
-    const isLastGroup = state.currentSubcategoryGroupIndex >= state.chiefComplaintSubcategories.length - 1
-    if (isLastGroup) {
-      // Go to text entry phase instead of complete
-      dispatch({ type: 'SET_CHIEF_COMPLAINT_TEXT_PHASE' })
-    } else {
-      dispatch({ type: 'NEXT_SUBCATEGORY_GROUP' })
-    }
-  }, [state.currentSubcategoryGroupIndex, state.chiefComplaintSubcategories.length])
-
-  const setCategoryTiming = useCallback((categoryId: string, onsetBucket: OnsetBucket | '', trend: Trend | '') => {
-    dispatch({ type: 'SET_CATEGORY_TIMING', categoryId, onsetBucket, trend })
-  }, [])
-
-  const setChiefComplaintText = useCallback((text: string) => {
-    dispatch({ type: 'SET_CHIEF_COMPLAINT_TEXT', text })
-  }, [])
-
-  const submitChiefComplaintText = useCallback(async () => {
-    try {
-      // Build selections array from categoryTimingData and selectedSubcategoriesByCategory
-      const selections = Object.keys(state.categoryTimingData).map(categoryId => ({
-        category_id: categoryId,
-        onset_bucket: state.categoryTimingData[categoryId].onsetBucket,
-        trend: state.categoryTimingData[categoryId].trend,
-        family_ids: state.selectedSubcategoriesByCategory[categoryId] || []
-      }))
-
-      await questionService.submitChiefComplaint({
-        encounter_id: state.encounterId || null,
-        selections,
-        overall_text: state.chiefComplaintText
-      })
-      dispatch({ type: 'COMPLETE_CHIEF_COMPLAINT' })
-    } catch (err) {
-      dispatch({ type: 'SET_ERROR', error: err instanceof Error ? err.message : 'Failed to submit chief complaint' })
-    }
-  }, [state.categoryTimingData, state.selectedSubcategoriesByCategory, state.chiefComplaintText, state.encounterId])
-
-  const currentRegistrationQuestion = state.registrationQuestions[state.currentQuestionIndex]
-  const currentSafetyScreenQuestion = state.safetyScreenQuestions[state.currentQuestionIndex]
-  const currentSubcategoryGroup = state.chiefComplaintSubcategories[state.currentSubcategoryGroupIndex]
-
-  const registrationProgress = state.registrationQuestions.length > 0 
-    ? Object.keys(state.registrationAnswers).length / state.registrationQuestions.length 
-    : 0
-
-  const safetyScreenProgress = state.safetyScreenQuestions.length > 0 
-    ? (state.currentQuestionIndex) / state.safetyScreenQuestions.length 
-    : 0
-
-  const subcategoryGroupProgress = state.chiefComplaintSubcategories.length > 0
-    ? state.currentSubcategoryGroupIndex / state.chiefComplaintSubcategories.length
-    : 0
-
-  const isLastSubcategoryGroup = state.currentSubcategoryGroupIndex >= state.chiefComplaintSubcategories.length - 1
+  // Build state object for backward compatibility
+  const state = {
+    phase,
+    currentQuestionIndex: phase === 'registration_questions' 
+      ? registration.currentIndex 
+      : safetyScreen.currentIndex,
+    registrationQuestions: registration.questions,
+    registrationAnswers: registration.answers,
+    safetyScreenQuestions: safetyScreen.questions,
+    safetyScreenAnswers: safetyScreen.answers,
+    chiefComplaintCategories: chiefComplaint.categories,
+    selectedCategories: chiefComplaint.selectedCategories,
+    chiefComplaintSubcategories: chiefComplaint.subcategories,
+    selectedSubcategoriesByCategory: chiefComplaint.selectedSubcategoriesByCategory,
+    currentSubcategoryGroupIndex: chiefComplaint.currentSubcategoryGroupIndex,
+    chiefComplaintText: chiefComplaint.chiefComplaintText,
+    categoryTimingData: chiefComplaint.categoryTimingData,
+    encounterId: registration.encounterId,
+    error,
+    uiMessage,
+    encounterToken,
+  }
 
   return {
     state,
-    encounterId: state.encounterId,
-    currentRegistrationQuestion,
-    currentSafetyScreenQuestion,
-    registrationProgress,
-    safetyScreenProgress,
-    answerRegistrationQuestion,
-    completeRegistration,
-    answerSafetyScreenQuestion,
-    // Chief Complaint exports
-    chiefComplaintCategories: state.chiefComplaintCategories,
-    selectedCategories: state.selectedCategories,
-    chiefComplaintSubcategories: state.chiefComplaintSubcategories,
-    selectedSubcategoriesByCategory: state.selectedSubcategoriesByCategory,
-    currentSubcategoryGroup,
-    currentSubcategoryGroupIndex: state.currentSubcategoryGroupIndex,
-    subcategoryGroupProgress,
-    isLastSubcategoryGroup,
-    selectCategory,
-    deselectCategory,
-    toggleCategory,
-    completeCategorySelection,
-    selectSubcategory,
-    deselectSubcategory,
-    toggleSubcategory,
-    nextSubcategoryGroup,
-    // Category Timing Data
-    categoryTimingData: state.categoryTimingData,
-    setCategoryTiming,
+    encounterId: registration.encounterId,
+    // Registration
+    currentRegistrationQuestion: registration.currentQuestion,
+    registrationProgress: registration.progress,
+    answerRegistrationQuestion: handleRegistrationAnswer,
+    completeRegistration: handleCompleteRegistration,
+    // Safety Screen
+    currentSafetyScreenQuestion: safetyScreen.currentQuestion,
+    safetyScreenProgress: safetyScreen.progress,
+    answerSafetyScreenQuestion: handleSafetyScreenAnswer,
+    // Chief Complaint
+    chiefComplaintCategories: chiefComplaint.categories,
+    selectedCategories: chiefComplaint.selectedCategories,
+    chiefComplaintSubcategories: chiefComplaint.subcategories,
+    selectedSubcategoriesByCategory: chiefComplaint.selectedSubcategoriesByCategory,
+    currentSubcategoryGroup: chiefComplaint.currentSubcategoryGroup,
+    currentSubcategoryGroupIndex: chiefComplaint.currentSubcategoryGroupIndex,
+    subcategoryGroupProgress: chiefComplaint.subcategoryGroupProgress,
+    isLastSubcategoryGroup: chiefComplaint.isLastSubcategoryGroup,
+    toggleCategory: chiefComplaint.toggleCategory,
+    completeCategorySelection: handleCompleteCategorySelection,
+
+    toggleSubcategory: chiefComplaint.toggleSubcategory,
+    nextSubcategoryGroup: handleNextSubcategoryGroup,
+    // Timing
+    categoryTimingData: chiefComplaint.categoryTimingData,
+    setCategoryTiming: chiefComplaint.setCategoryTiming,
     // Chief Complaint Text
-    chiefComplaintText: state.chiefComplaintText,
-    setChiefComplaintText,
-    submitChiefComplaintText
+    chiefComplaintText: chiefComplaint.chiefComplaintText,
+    setChiefComplaintText: chiefComplaint.setChiefComplaintText,
+    submitChiefComplaintText: handleSubmitChiefComplaintText,
   }
 }
