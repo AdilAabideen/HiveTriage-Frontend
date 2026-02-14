@@ -29,7 +29,6 @@ export const questionService = {
   },
 
   submitRegistration: async (registrationAnswers: Record<string, string>) => {
-    console.log('submitRegistration', registrationAnswers)
     const response = await fetch(`${API_BASE_URL}/submit-registration`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -57,67 +56,70 @@ export const questionService = {
     return response.json()
   },
 
-  getChiefComplaintCategories: async () => {
-    const response = await fetch(`${API_BASE_URL}/chief-complaint/categories`)
+  getChiefComplaintCategories: async (encounterId: string) => {
+    const response = await fetch(`${API_BASE_URL}/v2/chief-complaint/categories`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ encounter_id: encounterId })
+    })
     if (!response.ok) {
       throw new Error('Failed to fetch chief complaint categories')
     }
     const data = await response.json()
     // Map category_id to id for frontend consistency
-    return data.map((cat: { category_id: string; label: string; description: string; icon: string; sort_order: number }) => ({
+    return data.map((cat: { category_id: string; label: string; description: string; patient_explanation: string }) => ({
       id: cat.category_id,
       label: cat.label,
       description: cat.description,
-      icon: cat.icon,
-      sort_order: cat.sort_order
+      patient_explanation: cat.patient_explanation,
     }))
   },
 
-  getChiefComplaintSubcategories: async (selection: CategorySelection) => {
-    const response = await fetch(`${API_BASE_URL}/chief-complaint/subcategories`, {
+  getChiefComplaintPresentations: async (selection: CategorySelection) => {
+    const response = await fetch(`${API_BASE_URL}/v2/chief-complaint/presentations`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(selection)
     })
     if (!response.ok) {
-      throw new Error('Failed to fetch chief complaint subcategories')
+      throw new Error('Failed to fetch chief complaint presentations')
     }
     const data = await response.json()
 
-    // Map through subcategories_by_category, keeping grouped structure
-    const subcategories = data.subcategories_by_category.map(
-      (category: { category_name: string; category_id: string; subcategories: Array<{ family_id: string; label: string; description: string; icon: string; sort_order: number }> }) => ({
+    // Map through presentations_by_category, keeping grouped structure
+    const presentations = data.presentations_by_category.map(
+      (category: { category_name: string; category_id: string; presentations: Array<{ presentation_id: string; label: string; description: string; ui_icon: string; sort_order: number, patient_label: string, patient_explanation: string, patient_examples: string, patient_avoid_if: string, synonyms: string }> }) => ({
         category_name: category.category_name,
         category_id: category.category_id,
-        subcategories: category.subcategories.map((sub) => ({
-          id: sub.family_id,
-          label: sub.label,
-          description: sub.description,
-          icon: sub.icon,
-          sort_order: sub.sort_order
+        presentations: category.presentations.map((pres) => ({
+          id: pres.presentation_id,
+          label: pres.label,
+          patient_label: pres.patient_label,
+          patient_explanation: pres.patient_explanation,
+          patient_examples: pres.patient_examples,
+          patient_avoid_if: pres.patient_avoid_if,
+          description: pres.description,
+          icon: pres.ui_icon,
+          sort_order: pres.sort_order,
+          synonyms: pres.synonyms
         }))
       })
     )
 
     return {
       num_categories: data.num_categories,
-      subcategories
+      presentations
     }
   },
 
   submitChiefComplaint: async (payload: ChiefComplaintSubmission) => {
-    const response = await fetch(`${API_BASE_URL}/submit-chief-complaint`, {
+    const response = await fetch(`${API_BASE_URL}/v2/submit-chief-complaint`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         encounter_id: payload.encounter_id,
-        selections: payload.selections.map(selection => ({
-          category_id: selection.category_id,
-          onset_bucket: selection.onset_bucket || null,
-          trend: selection.trend || null,
-          family_ids: selection.family_ids
-        })),
-        overall_text: payload.overall_text || null
+        overall_text: payload.overall_text || null,
+        selected_categories: payload.selected_categories,
       })
     })
     if (!response.ok) {

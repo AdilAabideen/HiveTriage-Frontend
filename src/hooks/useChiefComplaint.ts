@@ -1,24 +1,27 @@
 /**
- * Hook for managing chief complaint flow (categories, subcategories, timing, text)
+ * Hook for managing chief complaint flow (categories, presentations, timings, text)
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { 
-  ChiefComplaintCategory, 
-  CategorySelectionItem, 
-  ChiefComplaintSubcategory,
-  ChiefComplaintSubcategoriesResponse,
+import {
+  ChiefComplaintCategory,
+  CategorySelectionItem,
+  ChiefComplaintPresentation,
+  ChiefComplaintPresentationsResponse,
+  PresentationTiming,
   OnsetBucket,
   Trend,
-  ChiefComplaintSelection
+  ChiefComplaintSelectedCategory,
+  ChiefComplaintSelectedPresentation,
 } from '../types'
 import { questionService } from '../services/questionService'
 
-export type ChiefComplaintPhase = 
+export type ChiefComplaintPhase =
   | 'loading_categories'
   | 'categories'
-  | 'loading_subcategories'
-  | 'subcategories'
+  | 'loading_presentations'
+  | 'presentations'
+  | 'timings'
   | 'text_entry'
   | 'submitting'
   | 'complete'
@@ -27,22 +30,22 @@ export function useChiefComplaint(encounterId: string | null, shouldStart: boole
   const [phase, setPhase] = useState<ChiefComplaintPhase>('loading_categories')
   const [categories, setCategories] = useState<ChiefComplaintCategory[]>([])
   const [selectedCategories, setSelectedCategories] = useState<CategorySelectionItem[]>([])
-  const [subcategories, setSubcategories] = useState<ChiefComplaintSubcategory[]>([])
-  const [selectedSubcategoriesByCategory, setSelectedSubcategoriesByCategory] = useState<Record<string, string[]>>({})
-  const [currentSubcategoryGroupIndex, setCurrentSubcategoryGroupIndex] = useState(0)
-  const [categoryTimingData, setCategoryTimingData] = useState<Record<string, { onsetBucket: OnsetBucket | ''; trend: Trend | '' }>>({})
+  const [presentations, setPresentations] = useState<ChiefComplaintPresentation[]>([])
+  const [selectedPresentationsByCategory, setSelectedPresentationsByCategory] = useState<Record<string, string[]>>({})
+  const [currentPresentationGroupIndex, setCurrentPresentationGroupIndex] = useState(0)
+  const [presentationTimingById, setPresentationTimingById] = useState<Record<string, PresentationTiming>>({})
   const [chiefComplaintText, setChiefComplaintText] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
   // Fetch categories when started
   useEffect(() => {
-    if (!shouldStart) return
+    if (!shouldStart || !encounterId) return
     
     const fetchCategories = async () => {
       try {
         setIsLoading(true)
-        const data: ChiefComplaintCategory[] = await questionService.getChiefComplaintCategories()
+        const data: ChiefComplaintCategory[] = await questionService.getChiefComplaintCategories(encounterId)
         setCategories(data)
         setPhase('categories')
       } catch (err) {
@@ -52,28 +55,28 @@ export function useChiefComplaint(encounterId: string | null, shouldStart: boole
       }
     }
     fetchCategories()
-  }, [shouldStart])
+  }, [shouldStart, encounterId])
 
-  // Fetch subcategories when category selection is complete
+  // Fetch presentations when category selection is complete
   useEffect(() => {
-    if (phase !== 'loading_subcategories' || selectedCategories.length === 0) return
+    if (phase !== 'loading_presentations' || selectedCategories.length === 0) return
     
-    const fetchSubcategories = async () => {
+    const fetchPresentations = async () => {
       try {
         setIsLoading(true)
-        const response: ChiefComplaintSubcategoriesResponse = await questionService.getChiefComplaintSubcategories(
+        const response: ChiefComplaintPresentationsResponse = await questionService.getChiefComplaintPresentations(
           { categories: selectedCategories }
         )
-        setSubcategories(response.subcategories)
-        setCurrentSubcategoryGroupIndex(0)
-        setPhase('subcategories')
+        setPresentations(response.presentations)
+        setCurrentPresentationGroupIndex(0)
+        setPhase('presentations')
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load subcategories')
+        setError(err instanceof Error ? err.message : 'Failed to load presentations')
       } finally {
         setIsLoading(false)
       }
     }
-    fetchSubcategories()
+    fetchPresentations()
   }, [phase, selectedCategories])
 
   const toggleCategory = useCallback((id: string, name: string) => {
@@ -87,58 +90,85 @@ export function useChiefComplaint(encounterId: string | null, shouldStart: boole
 
   const completeCategorySelection = useCallback(() => {
     if (selectedCategories.length > 0) {
-      setPhase('loading_subcategories')
+      setPhase('loading_presentations')
     }
   }, [selectedCategories.length])
 
-  const toggleSubcategory = useCallback((categoryId: string, familyId: string) => {
-    setSelectedSubcategoriesByCategory(prev => {
-      const currentFamilyIds = prev[categoryId] || []
-      if (currentFamilyIds.includes(familyId)) {
+  const togglePresentation = useCallback((categoryId: string, presentationId: string) => {
+    setSelectedPresentationsByCategory(prev => {
+      const currentIds = prev[categoryId] || []
+      if (currentIds.includes(presentationId)) {
         return {
           ...prev,
-          [categoryId]: currentFamilyIds.filter(id => id !== familyId)
+          [categoryId]: currentIds.filter(id => id !== presentationId)
         }
       }
       return {
         ...prev,
-        [categoryId]: [...currentFamilyIds, familyId]
+        [categoryId]: [...currentIds, presentationId]
       }
     })
   }, [])
 
-  const setCategoryTiming = useCallback((categoryId: string, onsetBucket: OnsetBucket | '', trend: Trend | '') => {
-    setCategoryTimingData(prev => ({
-      ...prev,
-      [categoryId]: { onsetBucket, trend }
-    }))
-  }, [])
-
-  const nextSubcategoryGroup = useCallback(() => {
-    const isLastGroup = currentSubcategoryGroupIndex >= subcategories.length - 1
+  const nextPresentationGroup = useCallback(() => {
+    const isLastGroup = currentPresentationGroupIndex >= presentations.length - 1
     if (isLastGroup) {
-      setPhase('text_entry')
+      // After the last group of presentations, go to timings phase
+      setPhase('timings')
     } else {
-      setCurrentSubcategoryGroupIndex(prev => prev + 1)
+      setCurrentPresentationGroupIndex(prev => prev + 1)
     }
-  }, [currentSubcategoryGroupIndex, subcategories.length])
+  }, [currentPresentationGroupIndex, presentations.length])
+
+  const setPresentationTiming = useCallback(
+    (presentationId: string, onset: OnsetBucket | '', trend: Trend | '') => {
+      setPresentationTimingById(prev => ({
+        ...prev,
+        [presentationId]: { onset_bucket: onset, trend },
+      }))
+    },
+    []
+  )
+
+  const completeTimings = useCallback(() => {
+    setPhase('text_entry')
+  }, [])
 
   const submitChiefComplaint = useCallback(async () => {
     try {
       setPhase('submitting')
       
-      // Build selections array
-      const selections: ChiefComplaintSelection[] = Object.keys(categoryTimingData).map(categoryId => ({
-        category_id: categoryId,
-        onset_bucket: categoryTimingData[categoryId].onsetBucket,
-        trend: categoryTimingData[categoryId].trend,
-        family_ids: selectedSubcategoriesByCategory[categoryId] || []
-      }))
+      // Build selected_categories array in v2 shape
+      const selectedCategoriesPayload: ChiefComplaintSelectedCategory[] = presentations
+        .map(group => {
+          const selectedIds = selectedPresentationsByCategory[group.category_id] || []
+          const selected_presentations: ChiefComplaintSelectedPresentation[] = selectedIds.map(
+            presentationId => ({
+              category_id: group.category_id,
+              presentation_id: presentationId,
+              timing: presentationTimingById[presentationId] || {
+                onset_bucket: '' as OnsetBucket | '',
+                trend: '' as Trend | '',
+              },
+            })
+          )
+
+          if (selected_presentations.length === 0) {
+            return null
+          }
+
+          return {
+            category_name: group.category_name,
+            category_id: group.category_id,
+            selected_presentations,
+          } as ChiefComplaintSelectedCategory
+        })
+        .filter((c): c is ChiefComplaintSelectedCategory => c !== null)
 
       await questionService.submitChiefComplaint({
         encounter_id: encounterId,
-        selections,
-        overall_text: chiefComplaintText
+        overall_text: chiefComplaintText,
+        selected_categories: selectedCategoriesPayload,
       })
       
       setPhase('complete')
@@ -146,38 +176,51 @@ export function useChiefComplaint(encounterId: string | null, shouldStart: boole
       setError(err instanceof Error ? err.message : 'Failed to submit chief complaint')
       setPhase('text_entry') // Go back to text entry on error
     }
-  }, [categoryTimingData, selectedSubcategoriesByCategory, chiefComplaintText, encounterId])
+  }, [selectedPresentationsByCategory, chiefComplaintText, encounterId])
 
-  const currentSubcategoryGroup = subcategories[currentSubcategoryGroupIndex]
-  const subcategoryGroupProgress = subcategories.length > 0
-    ? currentSubcategoryGroupIndex / subcategories.length
+  const currentPresentationGroup = presentations[currentPresentationGroupIndex]
+  const presentationGroupProgress = presentations.length > 0
+    ? currentPresentationGroupIndex / presentations.length
     : 0
-  const isLastSubcategoryGroup = currentSubcategoryGroupIndex >= subcategories.length - 1
+  const isLastPresentationGroup = currentPresentationGroupIndex >= presentations.length - 1
+
+  const selectedPresentationsDetailed = presentations.flatMap(group => {
+    const selectedIds = selectedPresentationsByCategory[group.category_id] || []
+    return group.presentations
+      .filter(p => selectedIds.includes(p.id))
+      .map(p => ({
+        id: p.id,
+        label: p.patient_label || p.label,
+        description: p.patient_explanation || p.description,
+        categoryName: group.category_name,
+      }))
+  })
 
   return {
     // State
     phase,
     categories,
     selectedCategories,
-    subcategories,
-    selectedSubcategoriesByCategory,
-    currentSubcategoryGroup,
-    currentSubcategoryGroupIndex,
-    subcategoryGroupProgress,
-    isLastSubcategoryGroup,
-    categoryTimingData,
+    presentations,
+    selectedPresentationsByCategory,
+    currentPresentationGroup,
+    currentPresentationGroupIndex,
+    presentationGroupProgress,
+    isLastPresentationGroup,
+    presentationTimingById,
+    selectedPresentationsDetailed,
     chiefComplaintText,
     isLoading,
     error,
     // Actions
     toggleCategory,
     completeCategorySelection,
-    toggleSubcategory,
-    setCategoryTiming,
-    nextSubcategoryGroup,
+    togglePresentation,
+    nextPresentationGroup,
+    setPresentationTiming,
+    completeTimings,
     setChiefComplaintText,
     submitChiefComplaint,
     setError,
   }
 }
-

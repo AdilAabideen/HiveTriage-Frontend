@@ -87,6 +87,7 @@ export function renderIcon(
   iconName: string | null | undefined,
   props?: React.SVGAttributes<SVGElement> & { size?: number | string }
 ) {
+  if (!iconName) return null;
   const Icon = getIcon(iconName);
   return <Icon {...props} />;
 }

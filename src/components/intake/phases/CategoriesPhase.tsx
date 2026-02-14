@@ -2,7 +2,7 @@
  * Chief Complaint Categories Selection Phase
  */
 
-import { ChiefComplaintCategory, CategorySelectionItem } from '../../../types'
+import { ChiefComplaintCategory, CategorySelectionItem, CardItem } from '../../../types'
 import CategoryCard from '../CategoryCard'
 import { Button } from '../../ui'
 
@@ -33,10 +33,17 @@ export function CategoriesPhase({
 
         <div className="flex flex-col items-center justify-center w-full mt-2">
           <div className="grid grid-cols-3 gap-4 p-2 w-full max-h-[50vh] overflow-y-auto">
-            {categories.map((category) => (
+            {categories.map((category : ChiefComplaintCategory) => (
               <CategoryCard
                 key={category.id}
-                category={category}
+                category={
+                  {
+                    id: category.id,
+                    label: category.label,
+                    description: category.patient_explanation,
+                    icon: undefined,
+                  } as CardItem
+                }
                 isSelected={selectedCategories.some(c => c.id === category.id)}
                 onToggle={() => onToggle(category.id, category.label)}
               />

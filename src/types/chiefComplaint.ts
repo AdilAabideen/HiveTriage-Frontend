@@ -2,24 +2,44 @@
  * Chief Complaint related types
  */
 
-// Chief Complaint Category
+// Base type for CategoryCard component - works for both categories and presentations
+export interface CardItem {
+  id: string
+  label: string
+  description: string
+  icon?: string | null
+}
+
+// Chief Complaint Presentation item (from backend)
+export interface ChiefComplaintPresentationsData {
+  id: string
+  label: string
+  description: string
+  icon: string | null
+  sort_order: number
+  patient_label: string
+  patient_explanation: string
+  patient_examples: string
+  patient_avoid_if: string
+  synonyms: string
+}
+
 export interface ChiefComplaintCategory {
   id: string
   label: string
   description: string
-  icon: string
-  sort_order: number
+  patient_explanation: string
 }
 
-export interface ChiefComplaintSubcategory {
+export interface ChiefComplaintPresentation {
   category_name: string
   category_id: string
-  subcategories: ChiefComplaintCategory[]
+  presentations: ChiefComplaintPresentationsData[]
 }
 
-export interface ChiefComplaintSubcategoriesResponse {
+export interface ChiefComplaintPresentationsResponse {
   num_categories: number
-  subcategories: ChiefComplaintSubcategory[]
+  presentations: ChiefComplaintPresentation[]
 }
 
 // Category Selection Item (for API submission)
@@ -44,17 +64,28 @@ export type Trend =
   | 'fluctuating'
   | 'not_sure'
 
-// Chief Complaint Submission Payload
-export interface ChiefComplaintSelection {
-  category_id: string
+// Timing per presentation (for onset/trend step)
+export interface PresentationTiming {
   onset_bucket: OnsetBucket | ''
   trend: Trend | ''
-  family_ids: string[]
+}
+
+// Chief Complaint Submission Payload (v2)
+export interface ChiefComplaintSelectedPresentation {
+  category_id: string
+  presentation_id: string
+  timing: PresentationTiming
+}
+
+export interface ChiefComplaintSelectedCategory {
+  category_name: string
+  category_id: string
+  selected_presentations: ChiefComplaintSelectedPresentation[]
 }
 
 export interface ChiefComplaintSubmission {
   encounter_id: string | null
-  selections: ChiefComplaintSelection[]
   overall_text: string
+  selected_categories: ChiefComplaintSelectedCategory[]
 }
 

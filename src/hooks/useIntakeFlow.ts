@@ -38,10 +38,13 @@ export function useIntakeFlow() {
     if (phase === 'chief_complaint_loading_categories' && chiefComplaint.phase === 'categories') {
       setPhase('chief_complaint_categories')
     }
-    if (phase === 'chief_complaint_loading_subcategories' && chiefComplaint.phase === 'subcategories') {
-      setPhase('chief_complaint_subcategories')
+    if (phase === 'chief_complaint_loading_presentations' && chiefComplaint.phase === 'presentations') {
+      setPhase('chief_complaint_presentations')
     }
-    if (chiefComplaint.phase === 'text_entry' && phase === 'chief_complaint_subcategories') {
+    if (phase === 'chief_complaint_presentations' && chiefComplaint.phase === 'timings') {
+      setPhase('chief_complaint_presentations_details')
+    }
+    if (chiefComplaint.phase === 'text_entry' && phase === 'chief_complaint_presentations_details') {
       setPhase('chief_complaint_text')
     }
     if (chiefComplaint.phase === 'complete') {
@@ -83,11 +86,11 @@ export function useIntakeFlow() {
   // Chief complaint handlers
   const handleCompleteCategorySelection = useCallback(() => {
     chiefComplaint.completeCategorySelection()
-    setPhase('chief_complaint_loading_subcategories')
+    setPhase('chief_complaint_loading_presentations')
   }, [chiefComplaint])
 
-  const handleNextSubcategoryGroup = useCallback(() => {
-    chiefComplaint.nextSubcategoryGroup()
+  const handleNextPresentationGroup = useCallback(() => {
+    chiefComplaint.nextPresentationGroup()
   }, [chiefComplaint])
 
   const handleSubmitChiefComplaintText = useCallback(async () => {
@@ -106,11 +109,11 @@ export function useIntakeFlow() {
     safetyScreenAnswers: safetyScreen.answers,
     chiefComplaintCategories: chiefComplaint.categories,
     selectedCategories: chiefComplaint.selectedCategories,
-    chiefComplaintSubcategories: chiefComplaint.subcategories,
-    selectedSubcategoriesByCategory: chiefComplaint.selectedSubcategoriesByCategory,
-    currentSubcategoryGroupIndex: chiefComplaint.currentSubcategoryGroupIndex,
+    chiefComplaintPresentations: chiefComplaint.presentations,
+    selectedPresentationsByCategory: chiefComplaint.selectedPresentationsByCategory,
+    currentPresentationGroupIndex: chiefComplaint.currentPresentationGroupIndex,
+    presentationTimingById: chiefComplaint.presentationTimingById,
     chiefComplaintText: chiefComplaint.chiefComplaintText,
-    categoryTimingData: chiefComplaint.categoryTimingData,
     encounterId: registration.encounterId,
     error,
     uiMessage,
@@ -132,20 +135,20 @@ export function useIntakeFlow() {
     // Chief Complaint
     chiefComplaintCategories: chiefComplaint.categories,
     selectedCategories: chiefComplaint.selectedCategories,
-    chiefComplaintSubcategories: chiefComplaint.subcategories,
-    selectedSubcategoriesByCategory: chiefComplaint.selectedSubcategoriesByCategory,
-    currentSubcategoryGroup: chiefComplaint.currentSubcategoryGroup,
-    currentSubcategoryGroupIndex: chiefComplaint.currentSubcategoryGroupIndex,
-    subcategoryGroupProgress: chiefComplaint.subcategoryGroupProgress,
-    isLastSubcategoryGroup: chiefComplaint.isLastSubcategoryGroup,
+    chiefComplaintPresentations: chiefComplaint.presentations,
+    selectedPresentationsByCategory: chiefComplaint.selectedPresentationsByCategory,
+    currentPresentationGroup: chiefComplaint.currentPresentationGroup,
+    currentPresentationGroupIndex: chiefComplaint.currentPresentationGroupIndex,
+    presentationGroupProgress: chiefComplaint.presentationGroupProgress,
+    isLastPresentationGroup: chiefComplaint.isLastPresentationGroup,
+    selectedPresentationsDetailed: chiefComplaint.selectedPresentationsDetailed,
+    presentationTimingById: chiefComplaint.presentationTimingById,
     toggleCategory: chiefComplaint.toggleCategory,
     completeCategorySelection: handleCompleteCategorySelection,
-
-    toggleSubcategory: chiefComplaint.toggleSubcategory,
-    nextSubcategoryGroup: handleNextSubcategoryGroup,
-    // Timing
-    categoryTimingData: chiefComplaint.categoryTimingData,
-    setCategoryTiming: chiefComplaint.setCategoryTiming,
+    togglePresentation: chiefComplaint.togglePresentation,
+    nextPresentationGroup: handleNextPresentationGroup,
+    setPresentationTiming: chiefComplaint.setPresentationTiming,
+    completeTimings: chiefComplaint.completeTimings,
     // Chief Complaint Text
     chiefComplaintText: chiefComplaint.chiefComplaintText,
     setChiefComplaintText: chiefComplaint.setChiefComplaintText,

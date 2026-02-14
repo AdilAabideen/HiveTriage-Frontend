@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { BsCheckLg } from 'react-icons/bs'
-import { ChiefComplaintCategory } from '../../types'
+import { CardItem } from '../../types'
 import { renderIcon } from '../../utils/iconMap'
 
 export interface CategoryCardProps {
-  category: ChiefComplaintCategory
+  category: CardItem
   isSelected: boolean
   onToggle: () => void
 }
@@ -31,7 +31,7 @@ export function CategoryCard({ category, isSelected, onToggle }: CategoryCardPro
       <div className="flex flex-row items-center justify-between w-full">
         <div className={`text-lg font-medium text-start ${isSelected ? 'text-nhs' : 'text-black'}`}>
           <div className="flex flex-row items-center justify-center gap-2">
-            {renderIcon(category.icon, { className: 'text-4xl' })}
+
             <p className="text-md font-medium text-start">{category.label}</p>
           </div>
         </div>

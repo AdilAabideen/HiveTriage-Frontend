@@ -9,7 +9,8 @@ import {
   RegistrationPhase,
   SafetyScreenPhase,
   CategoriesPhase,
-  SubcategoriesPhase,
+  PresentationsPhase,
+  PresentationTimingsPhase,
   TextEntryPhase,
   CompletePhase,
   FailedPhase,
@@ -27,19 +28,19 @@ function IntakeFlow() {
     // Chief Complaint
     chiefComplaintCategories,
     selectedCategories,
-    chiefComplaintSubcategories,
-    selectedSubcategoriesByCategory,
-    currentSubcategoryGroup,
-    currentSubcategoryGroupIndex,
-    subcategoryGroupProgress,
-    isLastSubcategoryGroup,
+    chiefComplaintPresentations,
+    selectedPresentationsByCategory,
+    currentPresentationGroup,
+    currentPresentationGroupIndex,
+    presentationGroupProgress,
+    selectedPresentationsDetailed,
+    presentationTimingById,
     toggleCategory,
     completeCategorySelection,
-    toggleSubcategory,
-    nextSubcategoryGroup,
-    // Category Timing Data
-    categoryTimingData,
-    setCategoryTiming,
+    togglePresentation,
+    nextPresentationGroup,
+    setPresentationTiming,
+    completeTimings,
     // Chief Complaint Text
     chiefComplaintText,
     setChiefComplaintText,
@@ -48,7 +49,7 @@ function IntakeFlow() {
 
   // Error state
   if (state.error) {
-    return <ErrorScreen message={state.error} />
+    return <ErrorScreen message={state.error} phase={state.phase} />
   }
 
   // Loading registration questions
@@ -105,30 +106,39 @@ function IntakeFlow() {
     )
   }
 
-  // Loading Chief Complaint Subcategories
-  if (state.phase === 'chief_complaint_loading_subcategories') {
-    return <LoadingScreen message="Loading subcategories..." />
+  // Loading Chief Complaint Presentations
+  if (state.phase === 'chief_complaint_loading_presentations') {
+    return <LoadingScreen message="Loading presentations..." />
   }
 
-  // Phase 4: Chief Complaint Subcategories
-  if (state.phase === 'chief_complaint_subcategories' && currentSubcategoryGroup) {
+  // Phase 4: Chief Complaint Presentations
+  if (state.phase === 'chief_complaint_presentations' && currentPresentationGroup) {
     return (
-      <SubcategoriesPhase
-        subcategories={chiefComplaintSubcategories}
-        currentGroup={currentSubcategoryGroup}
-        currentGroupIndex={currentSubcategoryGroupIndex}
-        selectedByCategory={selectedSubcategoriesByCategory}
-        categoryTimingData={categoryTimingData}
-        progress={subcategoryGroupProgress}
-        isLastGroup={isLastSubcategoryGroup}
-        onToggleSubcategory={toggleSubcategory}
-        onSetTiming={setCategoryTiming}
-        onNext={nextSubcategoryGroup}
+      <PresentationsPhase
+        presentations={chiefComplaintPresentations}
+        currentGroup={currentPresentationGroup}
+        currentGroupIndex={currentPresentationGroupIndex}
+        selectedByCategory={selectedPresentationsByCategory}
+        progress={presentationGroupProgress}
+        onTogglePresentation={togglePresentation}
+        onNext={nextPresentationGroup}
       />
     )
   }
 
-  // Phase 5: Chief Complaint Text Entry
+  // Phase 5: Presentation Timings (onset & trend per presentation)
+  if (state.phase === 'chief_complaint_presentations_details') {
+    return (
+      <PresentationTimingsPhase
+        presentations={selectedPresentationsDetailed}
+        timings={presentationTimingById}
+        onChangeTiming={setPresentationTiming}
+        onComplete={completeTimings}
+      />
+    )
+  }
+
+  // Phase 6: Chief Complaint Text Entry
   if (state.phase === 'chief_complaint_text') {
     return (
       <TextEntryPhase
