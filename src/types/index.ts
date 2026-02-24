@@ -18,3 +18,5 @@ export * from './chiefComplaint'
 // Intake Flow types
 export * from './intake'
 
+// Triage types
+export * from './triage'

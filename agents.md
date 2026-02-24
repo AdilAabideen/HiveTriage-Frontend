@@ -1,0 +1,2 @@
+Explain CLEARYLY after each code change what code change you have done and why you have done it.
+Go File by file , code block by code block and explain why you write that code and justification to it please. 
