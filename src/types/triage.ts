@@ -56,3 +56,9 @@ export interface TriageAnswerRequest {
   thread_id: string
   answer: string[]
 }
+
+export interface TriageEncounterSummary {
+  encounter_id: string
+  patient_name: string
+  encounter_token: string
+}
