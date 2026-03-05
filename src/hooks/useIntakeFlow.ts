@@ -7,6 +7,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useRegistration } from './useRegistration'
 import { useSafetyScreen, SafetyScreenResult } from './useSafetyScreen'
 import { useChiefComplaint } from './useChiefComplaint'
+import { useTriage } from './useTriage'
 import { IntakePhase } from '../types'
 
 export function useIntakeFlow() {
@@ -24,6 +25,10 @@ export function useIntakeFlow() {
   const chiefComplaint = useChiefComplaint(
     registration.encounterId,
     phase === 'chief_complaint_loading_categories'
+  )
+  const triage = useTriage(
+    registration.encounterId,
+    phase === 'triage_questions'
   )
 
   // Sync loading state from safety screen
@@ -48,7 +53,7 @@ export function useIntakeFlow() {
       setPhase('chief_complaint_text')
     }
     if (chiefComplaint.phase === 'complete') {
-      setPhase('complete')
+      setPhase('triage_questions')
     }
   }, [phase, chiefComplaint.phase])
 
@@ -153,5 +158,13 @@ export function useIntakeFlow() {
     chiefComplaintText: chiefComplaint.chiefComplaintText,
     setChiefComplaintText: chiefComplaint.setChiefComplaintText,
     submitChiefComplaintText: handleSubmitChiefComplaintText,
+    // Triage
+    triageQuestion: triage.question,
+    triageIsLoading: triage.isLoading,
+    triageError: triage.error,
+    triageIsComplete: triage.isComplete,
+    triageFinalFlag: triage.finalFlag,
+    triageEncounterSummary: triage.encounterSummary,
+    submitTriageAnswer: triage.submitAnswer,
   }
 }

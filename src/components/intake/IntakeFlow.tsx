@@ -14,6 +14,7 @@ import {
   TextEntryPhase,
   CompletePhase,
   FailedPhase,
+  TriagePhase,
 } from './phases'
 
 function IntakeFlow() {
@@ -45,6 +46,14 @@ function IntakeFlow() {
     chiefComplaintText,
     setChiefComplaintText,
     submitChiefComplaintText,
+    // Triage
+    triageQuestion,
+    triageIsLoading,
+    triageError,
+    triageIsComplete,
+    triageFinalFlag,
+    triageEncounterSummary,
+    submitTriageAnswer,
   } = useIntakeFlow()
 
   // Error state
@@ -145,6 +154,21 @@ function IntakeFlow() {
         text={chiefComplaintText}
         onTextChange={setChiefComplaintText}
         onSubmit={submitChiefComplaintText}
+      />
+    )
+  }
+
+  // Phase 7: Triage Questions
+  if (state.phase === 'triage_questions') {
+    return (
+      <TriagePhase
+        question={triageQuestion}
+        isLoading={triageIsLoading}
+        error={triageError}
+        isComplete={triageIsComplete}
+        finalFlag={triageFinalFlag}
+        encounterSummary={triageEncounterSummary}
+        onSubmitAnswer={submitTriageAnswer}
       />
     )
   }

@@ -13,4 +13,4 @@ export {
 export { TextEntryPhase, type TextEntryPhaseProps } from './TextEntryPhase'
 export { CompletePhase } from './CompletePhase'
 export { FailedPhase, type FailedPhaseProps } from './FailedPhase'
-
+export { TriagePhase } from './TriagePhase'

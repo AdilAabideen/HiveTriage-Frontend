@@ -20,6 +20,7 @@ export type IntakePhase =
   | 'chief_complaint_presentations'
   | 'chief_complaint_presentations_details'
   | 'chief_complaint_text'
+  | 'triage_questions'
   | 'submitting'
   | 'complete'
   | 'failed_safety_screen'
